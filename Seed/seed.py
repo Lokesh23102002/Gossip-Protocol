@@ -49,6 +49,10 @@ class Seed:
                 string_to_send = {"response Type": "PeerList", "peers": list(self.peers.keys())}
                 client_socket.sendall(json.dumps(string_to_send).encode())
                 client_socket.close()
+            elif message_json["request Type"] == "Death":
+                self.peers.pop(message_json["host"]+":"+str(message_json["port"]))
+                logger.info(f"Removed peer {address[0]}:{message_json['port']}")
+                client_socket.close()
 
 
 
@@ -56,12 +60,14 @@ class Seed:
     def user_input(self):
         while self.running:
             user_input = input()
-            if user_input == "exit":
+            if user_input == "Exit":
                 self.running = False
                 self.server_socket.close()
+                print("Server stopped. Exiting...")
                 sys.exit()
-            elif user_input == "peers":
+            elif user_input == "Peers":
                 for peer in self.peers:
+                    print(f"{peer}")
                     logger.info(f"Peer: {peer}")
 
 

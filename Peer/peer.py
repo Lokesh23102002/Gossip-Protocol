@@ -10,6 +10,28 @@ import random
 import time
 import json
 
+class MessageList:
+
+    def __init__(self):
+        self.messageList = {} # Initialize ML
+
+    def insert(self, msg, IP): # Check if present, if not then add
+        message = msg
+        messageHash = hash(msg)
+        senderIP = IP
+
+        if messageHash in self.messageList.keys():
+            return False
+        else:
+            self.messageList[messageHash] = f"{message}:{senderIP}:{messageHash}"
+            return True
+    
+    def check(self, msg): # Check if present, return true, else return False
+        messageHash = hash(msg)
+        if messageHash in self.messageList.keys():
+            return True
+        else:
+            return False   
 
 class Peer:
     def __init__(self, host, port,listen_thread):
@@ -20,6 +42,7 @@ class Peer:
         self.running = True
         self.server_socket = None
         self.listen_thread = listen_thread
+        self.messageList = MessageList()
 
     def start_server(self):
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -78,23 +101,102 @@ class Peer:
                     self.peers[peer]= {"connection":False,"Recieved_from":seed}
         seed_socket.close()
 
+        self.connect_to_peers()
+    
+    def connect_to_peers(self):
+        logger.info("Starting peer connections...")
+
+        for peer in self.peers.keys():
+            if self.peers[peer]["connection"]:  # Skip already connected peers
+                logger.info(f"Skipping already connected peer: {peer}")
+                continue
+
+            peer_host, peer_port = peer.split(":")
+            peer_port = int(peer_port)
+
+            peer_thread = threading.Thread(target=self.connect_to_peer, args=(peer_host, peer_port))
+            peer_thread.start()
+    
+    def connect_to_peer(self, peer_host, peer_port):
+        logger.info(f"Attempting connection to peer {peer_host}:{peer_port}")
+
+        try:
+            peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            peer_socket.settimeout(2)  # Set timeout
+            peer_socket.connect((peer_host, peer_port))
+
+            # Send connection request
+            message = {"request Type": "ConnectPeer", "host": self.host, "port": self.port}
+            peer_socket.sendall(json.dumps(message).encode())
+
+            # Wait for response
+            response = peer_socket.recv(1024).decode()
+            if response:
+                response_data = json.loads(response)
+                if response_data.get("response Type") == "ConnectedToPeer":
+                    self.peers[f"{peer_host}:{peer_port}"]["connection"] = True
+                    logger.info(f"Successfully connected to peer {peer_host}:{peer_port}")
+                else:
+                    logger.warning(f"Unexpected response from {peer_host}:{peer_port}: {response_data}")
+
+            peer_socket.close()
+
+        except (socket.timeout, ConnectionRefusedError) as e:
+            logger.error(f"Failed to connect to peer {peer_host}:{peer_port}: {e}")
+        
+        finally:
+            if peer_socket:
+                peer_socket.close()
+
+
     def handle_client(self, client_socket, address):
         logger.info(f"Connection from {address}")
-        recieved_message = client_socket.recv(1024).decode()
-        if recieved_message:
-            message = json.loads(recieved_message)
-            if message["response Type"] == "ConnectedToSeed":
-                self.seeds[message["host"]+":"+str(message["port"])]['connection'] = True
-                logger.info(f"Received message: {recieved_message}")
-                client_socket.close()
-            else:
-                client_socket.close()
+        
+        try:
+            received_message = client_socket.recv(1024).decode()
+            if not received_message:
+                return  # No data received, ignore the request
+
+            message = json.loads(received_message)
+
+            if message.get("response Type") == "ConnectedToSeed":
+                # Handling seed connection acknowledgment
+                seed_key = f"{message['host']}:{message['port']}"
+                self.seeds[seed_key]['connection'] = True
+                logger.info(f"Received seed connection confirmation: {received_message}")
+
+            elif message.get("request Type") == "ConnectPeer":
+                # Handling peer connection request
+                peer_key = f"{message['host']}:{message['port']}"
+
+                # If peer is not already connected, add it to the peer list
+                if peer_key not in self.peers:
+                    self.peers[peer_key] = {"connection": True, "Received_from": address}
+                    logger.info(f"New peer added: {peer_key}")
+
+                # Send confirmation response
+                response = {"response Type": "ConnectedToPeer"}
+                client_socket.sendall(json.dumps(response).encode())
+                logger.info(f"Sent connection confirmation to {peer_key}")
+
+        except json.JSONDecodeError:
+            logger.error(f"Invalid JSON received from {address}")
+
+        except Exception as e:
+            logger.error(f"Error handling client {address}: {e}")
+
+        finally:
+            client_socket.close()  # Ensure socket closure
+
+
+    
+
 
     def user_input(self):
         while True:
             try:
                 user_input = input()
-                if user_input == 'q':
+                if user_input == 'Exit':
                     self.running = False  # Stop the server
                     try:
                         self.server_socket.close()
@@ -102,11 +204,11 @@ class Peer:
                         pass
                     print("Server stopped. Exiting...")
                     sys.exit()
-                elif user_input == 'p':
+                elif user_input == 'Peers':
                     print("Connected peers:")
                     for peer in self.peers:
                         print(f"{peer}:{self.peers[peer]}")
-                elif user_input == 's':
+                elif user_input == 'Seeds':
                     print("Connected seeds:")
                     for seed in self.seeds:
                         print(f"{seed}:{self.seeds[seed]}")
