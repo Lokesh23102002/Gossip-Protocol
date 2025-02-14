@@ -33,7 +33,7 @@ To exit write `exit` in the shell.
 ### Seed Node and Peer Node Communication
 The seed node and peer node communicate using following messages:
 - Requests from peers
-  - `Connect` This message is sent to Seed by peer for adding it to the network.
+  - `ConnectSeed` This message is sent to Seed by peer for adding it to the network.
   - `RequestPL` This message is sent to recieve the peer list by peer.
   - `Death` This message is sent to seed to delete the unresponsive node.
 - Response to peers
