@@ -17,25 +17,40 @@ when peer node start, it has to connect to n/2+1 seed node means just more than 
 The seed node and peer node communicate by passing various messages
 
 ## Shell commands
-### How to see All the connected Peers on a Seed
+### Shell commands of Seeds
 To see the Peers connected you can use the command `Peer` in the command line of the Seed server.
 
-### How to see All the connected Peers and Seeds on a Peer
-- To see the list of connected seeds and peers  on a Peer server you can enter following commands in the command line of the Peer.
+### Shell commands of Peers
+- All the shell commands are case-insensitive
   - `Peers` to see all connected peers and also the recieved peer list from seed.
   - `Seeds` to see all the connected seeds.
-
-### How to see the message sent and received by peer nodes.
+  - `msg` to see all messages
+  - `exit` to close the node and exit
 
 ## Gossip protocol Technicaleties.
+### Seed Node and Peer Node Communication
+The seed node and peer node communicate using following messages:
+- Requests from peers
+  - `Connect` This message is sent to Seed by peer for adding it to the network.
+  - `RequestPL` This message is sent to recieve the peer list by peer.
+- Response to peers
+  - `ConnectedToSeed` This response is sent to Peer after connection request is accepted.
+  - `PeerList` This response is sent to peer with the list of peers connected to the requested seed.
 
-
+### Peer Node and Peer Node Communication
+The peer node and peer node communicate using following messages:
+- Requests 
+  - `ConnectPeer` This message is sent by peer to connect to the nodes after recieving PeerList.
+  - `Gossip` This message is sent with the gossip message format.
+- Response
+  - `ConnectedToPeer` This is message is sent when the connection request is accepted.
+  
 ## How to run
 
 
 ## Contributors
 - [Lokesh Tanwar (B21EE035)]
-- [Jatin Verma (B21EE029)]
+- [Jatin Verma (B21EE028)]
 
 
 

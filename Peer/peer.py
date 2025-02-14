@@ -83,7 +83,7 @@ class Peer:
         seed_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         seed_socket.connect(seed)
         self.seeds[seed[0]+":"+str(seed[1])]['connection'] = False
-        message = {"request Type": "Connect","host": self.host, "port": self.port}
+        message = {"request Type": "ConnectSeed","host": self.host, "port": self.port}
         while not self.seeds[seed[0]+":"+str(seed[1])]['connection']:
             seed_socket.sendall(json.dumps(message).encode())
             time.sleep(0.1)

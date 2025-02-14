@@ -35,7 +35,7 @@ class Seed:
         recieved_message = client_socket.recv(1024).decode()
         message_json = json.loads(recieved_message)
         if recieved_message:
-            if message_json["request Type"] == "Connect":
+            if message_json["request Type"] == "ConnectSeed":
                 self.peers[message_json["host"]+":"+str(message_json["port"])] = (message_json["host"], message_json["port"])
                 logger.info(f"Added peer {address[0]}:{message_json['port']}")
                 client_socket.close()
@@ -59,7 +59,7 @@ class Seed:
 
     def user_input(self):
         while self.running:
-            user_input = input()
+            user_input = input().strip().lower()
             if user_input == "Exit":
                 self.running = False
                 self.server_socket.close()
