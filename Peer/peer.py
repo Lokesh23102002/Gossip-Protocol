@@ -179,6 +179,23 @@ class Peer:
                 client_socket.sendall(json.dumps(response).encode())
                 logger.info(f"Sent connection confirmation to {peer_key}")
 
+            elif message.get("request Type") == "Gossip":
+                gossip_msg = message["message"]
+                
+                if not self.messageList.check(gossip_msg):  # Avoid duplicate propagation
+                    logger.info(f"Received gossip message: {gossip_msg}")
+
+                    # Store the message to prevent reprocessing
+                    self.messageList.insert(gossip_msg, address[0])
+
+                    # Forward the message to other peers
+                    for peer in self.peers.keys():
+                        if peer != f"{message['host']}:{message['port']}" and self.peers[peer]["connection"]:
+                            peer_host, peer_port = peer.split(":")
+                            peer_port = int(peer_port)
+                            self.send_message_to_peer(peer_host, peer_port, gossip_msg)
+
+
         except json.JSONDecodeError:
             logger.error(f"Invalid JSON received from {address}")
 
@@ -189,14 +206,53 @@ class Peer:
             client_socket.close()  # Ensure socket closure
 
 
-    
+    def gossip_message(self):
+        """Generate and send gossip messages every 5 seconds to all connected peers."""
+        message_count = 0
+
+        while message_count < 10:  # Generate only 10 messages
+            timestamp = int(time.time())
+            message = f"{timestamp}:{self.host}:{self.port}:{message_count}"
+            
+            # Store the message in MessageList to avoid duplicate propagation
+            if self.messageList.insert(message, self.host):
+                logger.info(f"Generated gossip message: {message}")
+                
+                # Send the message to all connected peers
+                for peer in self.peers.keys():
+                    if self.peers[peer]["connection"]:  # Send only to connected peers
+                        peer_host, peer_port = peer.split(":")
+                        peer_port = int(peer_port)
+                        self.send_message_to_peer(peer_host, peer_port, message)
+
+            message_count += 1
+            time.sleep(5)  # Wait 5 seconds before sending the next message
+
+    def send_message_to_peer(self, peer_host, peer_port, message):
+        """Send a gossip message to a connected peer."""
+        try:
+            peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            peer_socket.settimeout(2)  # Set timeout
+            peer_socket.connect((peer_host, peer_port))
+
+            # Wrap the message in JSON format
+            message_data = {"request Type": "Gossip", "message": message,"host": self.host, "port": self.port}
+            peer_socket.sendall(json.dumps(message_data).encode())
+
+            logger.info(f"Sent gossip message to {peer_host}:{peer_port}")
+            peer_socket.close()
+        
+        except (socket.timeout, ConnectionRefusedError) as e:
+            logger.error(f"Failed to send gossip message to {peer_host}:{peer_port}: {e}")
+
 
 
     def user_input(self):
         while True:
             try:
-                user_input = input()
-                if user_input == 'Exit':
+                user_input = input().strip().lower()  # Convert to lowercase and remove leading/trailing spaces
+
+                if user_input == 'exit':
                     self.running = False  # Stop the server
                     try:
                         self.server_socket.close()
@@ -204,18 +260,30 @@ class Peer:
                         pass
                     print("Server stopped. Exiting...")
                     sys.exit()
-                elif user_input == 'Peers':
+
+                elif user_input == 'peers':
                     print("Connected peers:")
                     for peer in self.peers:
-                        print(f"{peer}:{self.peers[peer]}")
-                elif user_input == 'Seeds':
+                        print(f"{peer}: {self.peers[peer]}")
+
+                elif user_input == 'seeds':
                     print("Connected seeds:")
                     for seed in self.seeds:
-                        print(f"{seed}:{self.seeds[seed]}")
+                        print(f"{seed}: {self.seeds[seed]}")
+
+                elif user_input == 'msg':
+                    print("Received Messages:")
+                    if not self.messageList.messageList:
+                        print("No messages received yet.")
+                    else:
+                        for msg_hash, msg_data in self.messageList.messageList.items():
+                            print(f"{msg_data}")
+
             except EOFError:
-                self.running = False 
+                self.running = False
                 print("Input stream closed unexpectedly. Exiting...")
                 sys.exit()
+
 
 
 
@@ -245,6 +313,11 @@ def __main__():
     user_input_thread = threading.Thread(target=peer.user_input, daemon=True)
     user_input_thread.start()
     # Join both threads to keep the program running
+
+    # Start gossip message generation in a separate thread
+    gossip_thread = threading.Thread(target=peer.gossip_message, daemon=True)
+    gossip_thread.start()
+
     server_thread.join()
     seed_thread.join()
     user_input_thread.join()
