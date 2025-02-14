@@ -18,7 +18,9 @@ The seed node and peer node communicate by passing various messages
 
 ## Shell commands
 ### Shell commands of Seeds
-To see the Peers connected you can use the command `Peer` in the command line of the Seed server.
+All the shell commands are case-insensitive  
+To see the Peers connected you can use the command `Peers` in the command line of the Seed server.  
+To exit write `exit` in the shell.
 
 ### Shell commands of Peers
 - All the shell commands are case-insensitive
@@ -33,6 +35,7 @@ The seed node and peer node communicate using following messages:
 - Requests from peers
   - `Connect` This message is sent to Seed by peer for adding it to the network.
   - `RequestPL` This message is sent to recieve the peer list by peer.
+  - `Death` This message is sent to seed to delete the unresponsive node.
 - Response to peers
   - `ConnectedToSeed` This response is sent to Peer after connection request is accepted.
   - `PeerList` This response is sent to peer with the list of peers connected to the requested seed.
@@ -42,10 +45,27 @@ The peer node and peer node communicate using following messages:
 - Requests 
   - `ConnectPeer` This message is sent by peer to connect to the nodes after recieving PeerList.
   - `Gossip` This message is sent with the gossip message format.
+  
 - Response
   - `ConnectedToPeer` This is message is sent when the connection request is accepted.
-  
+
+Other than these messages each peer node also send ping message to the connected peer nodes every 13seconds
+
 ## How to run
+For this implementation we have used python 3.11.11 
+There is a requirement.txt file first you have to install these requirements
+After that make changes to config.csv with seed ip and port numbers
+After that start the seed nodes
+    - `python Seed/seed.py --port <PORT_NUMBER> --max-peers <MAX_PEERS>` use this command to start all seed nodes
+    - For testing purpose a batch file is also provided in which add the path to your conda environment add the port    numbers and start the ports
+
+After that start the peers nodes
+    - `python Peer/peer.py --port <PORT_NUMBER> --max-peers <MAX_PEERS>` use this command to start all peer nodes.
+    - For testing purpose a batch file is also provided in which add the path to your conda environment add the port    numbers and start the nodes at that port
+
+NOTE:- by default the ip used is the ip used by your PC (Host device).
+
+
 
 
 ## Contributors

@@ -81,28 +81,60 @@ class Peer:
     
     def connect_to_seed(self, seed):
         logger.info(f"Connecting to seed {seed}")
-        seed_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        seed_socket.connect(seed)
-        self.seeds[seed[0]+":"+str(seed[1])]['connection'] = False
-        message = {"request Type": "ConnectSeed","host": self.host, "port": self.port}
-        while not self.seeds[seed[0]+":"+str(seed[1])]['connection']:
-            seed_socket.sendall(json.dumps(message).encode())
-            time.sleep(0.1)
 
-        seed_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        seed_socket.connect(seed)
-        string_to_send = {"request Type": "RequestPL"}
-        seed_socket.sendall(json.dumps(string_to_send).encode())
-        recieved_message = seed_socket.recv(1024).decode()
-        message = json.loads(recieved_message)
-        logger.info(f"Recieved peer {message}")
-        if message["response Type"] == "PeerList":
-            for peer in message["peers"]:
-                if(peer != self.host+":"+str(self.port)):
-                    self.peers[peer]= {"connection":False,"Recieved_from":seed}
-        seed_socket.close()
+        try:
+            seed_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            seed_socket.settimeout(3)  # Prevent blocking
+            seed_socket.connect(seed)
 
-        self.connect_to_peers()
+            seed_key = f"{seed[0]}:{seed[1]}"
+            self.seeds[seed_key]['connection'] = False
+
+            message = {"request Type": "ConnectSeed", "host": self.host, "port": self.port}
+
+            for _ in range(10):  # Retry up to 10 times, then give up
+                try:
+                    seed_socket.sendall(json.dumps(message).encode())
+                    time.sleep(0.1)
+
+                    if self.seeds[seed_key]['connection']:
+                        break  # Stop sending once connected
+                except (BrokenPipeError, ConnectionResetError) as e:
+                    logger.error(f"Failed to send data to seed {seed}: {e}")
+                    return  # Stop execution on failure
+
+            # Close the first socket before creating a new one
+            seed_socket.close()
+
+            # New socket to request Peer List (PL)
+            seed_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            seed_socket.settimeout(3)  
+            seed_socket.connect(seed)
+
+            request_pl = {"request Type": "RequestPL"}
+            seed_socket.sendall(json.dumps(request_pl).encode())
+
+            received_message = seed_socket.recv(1024).decode()
+            message = json.loads(received_message)
+
+            logger.info(f"Received peer list from {seed}: {message}")
+
+            if message.get("response Type") == "PeerList":
+                for peer in message.get("peers", []):
+                    if peer != f"{self.host}:{self.port}":
+                        self.peers[peer] = {"connection": False, "Received_from": seed}
+
+            seed_socket.close()
+
+            self.connect_to_peers()
+
+        except (socket.timeout, ConnectionRefusedError) as e:
+            logger.error(f"Failed to connect to seed {seed}: {e}")
+
+        finally:
+            if seed_socket:
+                seed_socket.close()  # Ensure socket is closed
+
     
     def connect_to_peers(self):
         logger.info("Starting peer connections...")
