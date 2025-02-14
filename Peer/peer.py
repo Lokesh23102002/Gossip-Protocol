@@ -244,6 +244,65 @@ class Peer:
         
         except (socket.timeout, ConnectionRefusedError) as e:
             logger.error(f"Failed to send gossip message to {peer_host}:{peer_port}: {e}")
+    
+    def check_peer_liveness(self):
+        """Checks if connected peers are alive by attempting to open a TCP connection."""
+        logger.info("Starting peer liveliness check thread...")  # Debugging log
+
+        while self.running:
+            logger.info("Liveliness thread is active.")  # Debugging log
+            for peer in list(self.peers.keys()):
+                if not self.peers[peer].get("connection", False):
+                    logger.info(f"Checking peer {peer}...")  # Debugging log
+                    continue
+
+                peer_host, peer_port = peer.split(":")
+                peer_port = int(peer_port)
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(1)
+
+                try:
+                    sock.connect((peer_host, peer_port))
+                    sock.close()
+                    self.peers[peer]["ping_failures"] = 0  # Reset failure count
+                    logger.info(f"Peer {peer} is alive.")
+
+                except (socket.timeout, ConnectionRefusedError):
+                    self.peers[peer]["ping_failures"] = self.peers.get(peer, {}).get("ping_failures", 0) + 1
+                    logger.warning(f"Peer {peer} is unresponsive ({self.peers[peer]['ping_failures']} failures).")
+
+                    if self.peers[peer]["ping_failures"] >= 3:
+                        logger.error(f"Peer {peer} is dead! Removing and notifying seeds.")
+                        self.peers.pop(peer, None)
+                        for seed in self.seeds.keys():
+                            self.notify_seed_of_death(seed, peer_host, peer_port)
+
+                finally:
+                    sock.close()
+
+            time.sleep(13)  # Delay before the next check
+
+
+    def notify_seed_of_death(self, seed, dead_host, dead_port):
+        """Notifies a seed node that a peer is no longer alive."""
+        try:
+            seed_host, seed_port = seed.split(":")
+            seed_port = int(seed_port)
+
+            seed_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            seed_socket.settimeout(2)
+            seed_socket.connect((seed_host, seed_port))
+
+            message = {"request Type": "Death", "host": dead_host, "port": dead_port}
+            seed_socket.sendall(json.dumps(message).encode())
+
+            logger.info(f"Notified seed {seed} about dead peer {dead_host}:{dead_port}")
+            seed_socket.close()
+
+        except (socket.timeout, ConnectionRefusedError) as e:
+            logger.error(f"Failed to notify seed {seed} about dead peer: {e}")
+
+
 
 
 
@@ -305,6 +364,10 @@ def __main__():
     server_thread = threading.Thread(target=peer.start_server, daemon=True)
     server_thread.start()
 
+        # Start peer liveness check in a separate thread
+    liveness_thread = threading.Thread(target=peer.check_peer_liveness, daemon=True)
+    liveness_thread.start()
+
     # Start seed connection in another thread
     seed_thread = threading.Thread(target=peer.connect_to_seeds, daemon=True)
     seed_thread.start()
@@ -312,15 +375,18 @@ def __main__():
     # Start user input thread
     user_input_thread = threading.Thread(target=peer.user_input, daemon=True)
     user_input_thread.start()
-    # Join both threads to keep the program running
+
 
     # Start gossip message generation in a separate thread
     gossip_thread = threading.Thread(target=peer.gossip_message, daemon=True)
     gossip_thread.start()
 
+
+
     server_thread.join()
     seed_thread.join()
     user_input_thread.join()
+    
 
 if __name__ == '__main__':
     __main__()

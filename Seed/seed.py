@@ -50,8 +50,12 @@ class Seed:
                 client_socket.sendall(json.dumps(string_to_send).encode())
                 client_socket.close()
             elif message_json["request Type"] == "Death":
-                self.peers.pop(message_json["host"]+":"+str(message_json["port"]))
-                logger.info(f"Removed peer {address[0]}:{message_json['port']}")
+                dead_peer = f"{message_json['host']}:{message_json['port']}"
+
+                if dead_peer in self.peers:
+                    self.peers.pop(dead_peer, None)
+                    logger.info(f"Removed dead peer {dead_peer} as reported by {address[0]}")
+
                 client_socket.close()
 
 
