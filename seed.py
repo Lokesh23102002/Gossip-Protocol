@@ -18,15 +18,15 @@ class Seed:
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind((self.host, self.port))
         self.server_socket.listen(self.listen_thread)
-        self.server_socket.setblocking(False)
+        self.server_socket.setblocking(True)
         logger.info(f"Server started on {self.host}:{self.port}")
         while self.running:
             try:
                 client_socket, address = self.server_socket.accept()
                 client_thread = threading.Thread(target=self.handle_client, args=(client_socket, address))
                 client_thread.start()
-            except BlockingIOError:
-                time.sleep(0.1)
+            # except BlockingIOError:
+            #     time.sleep(0.1)
             except OSError:
                 break
 
@@ -64,12 +64,12 @@ class Seed:
     def user_input(self):
         while self.running:
             user_input = input().strip().lower()
-            if user_input == "Exit":
+            if user_input == "exit":
                 self.running = False
                 self.server_socket.close()
                 print("Server stopped. Exiting...")
                 sys.exit()
-            elif user_input == "Peers":
+            elif user_input == "peers":
                 for peer in self.peers:
                     print(f"{peer}")
                     logger.info(f"Peer: {peer}")
@@ -86,12 +86,12 @@ def main():
     logger.info(f"Starting seed on port {args.port}")
     logger.info(f"Maximum peers: {args.max_peers}")
     seed = Seed(HOST, args.port, args.max_peers)
-    server_start_thread = threading.Thread(target=seed.start_server)
+    server_start_thread = threading.Thread(target=seed.start_server,daemon=True)
     server_start_thread.start()
-    user_input_thread = threading.Thread(target=seed.user_input)
+    user_input_thread = threading.Thread(target=seed.user_input,daemon=True)
     user_input_thread.start()
-    server_start_thread.join()
     user_input_thread.join()
+
 
 if __name__ == '__main__':
     main()
