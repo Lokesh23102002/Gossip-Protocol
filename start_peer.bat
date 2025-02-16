@@ -8,13 +8,10 @@ set PYTHON_PATH=python
 rem List of ports to start the peer servers
 set PORTS=3000 3001 
 
-rem Initialize Conda (Adjust path if necessary)
-call "%UserProfile%\anaconda3\Scripts\activate.bat" >nul
-
 rem Loop through each port and start a peer server in a new Command Prompt
 for %%P in (%PORTS%) do (
     echo Starting Peer server on port %%P...
-    start cmd /k "conda activate %CONDA_ENV% && %PYTHON_PATH% Peer\peer.py --port %%P --max-peers 20"
+    start cmd /k %PYTHON_PATH% peer.py --port %%P --max-peers 20"
 )
 
 echo All Peer servers started.

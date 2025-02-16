@@ -66,7 +66,7 @@ class Peer:
             
     def connect_to_seeds(self):
         seed_list = {}
-        with open('Peer/config.csv', 'r') as file:
+        with open('config.csv', 'r') as file:
             reader = csv.reader(file)
             for row in reader:
                 self.seeds[row[0]+":"+row[1]] = {'host': row[0], 'port': int(row[1])}
