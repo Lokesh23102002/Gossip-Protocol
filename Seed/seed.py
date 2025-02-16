@@ -63,24 +63,38 @@ class Seed:
 
     def user_input(self):
         while self.running:
-            user_input = input().strip().lower()
-            if user_input == "Exit":
+            try:
+                user_input = input().strip().lower()
+            except EOFError:
                 self.running = False
                 self.server_socket.close()
                 print("Server stopped. Exiting...")
                 sys.exit()
-            elif user_input == "Peers":
+            
+            if user_input == "exit":
+                self.running = False
+                self.server_socket.close()
+                print("Server stopped. Exiting...")
+                sys.exit()
+            elif user_input == "peers":
                 for peer in self.peers:
                     print(f"{peer}")
                     logger.info(f"Peer: {peer}")
+          
 
 
 def main():
     parser = argparse.ArgumentParser(description="P2P Seed")
     parser.add_argument("--port", type=int, default=1234, help="Port number for the seed to listen on")
     parser.add_argument("--max-peers", type=int, default=5, help="Maximum number of peers to connect to")
-    HOST = socket.gethostbyname(socket.gethostname())
+    parser.add_argument("--host", type=str, default="localhost", help="Host address of the seed")
     args = parser.parse_args()
+    if args.host == "localhost":
+        HOST = "localhost"
+    elif args.host == "":
+        HOST = socket.gethostbyname(socket.gethostname())
+    else:
+        HOST = args.host
     global logger 
     logger = setup_logger(f"logs/seed_{HOST}_{args.port}.log")
     logger.info(f"Starting seed on port {args.port}")

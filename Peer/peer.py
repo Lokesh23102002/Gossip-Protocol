@@ -80,7 +80,7 @@ class Peer:
             seed_thread.join()
     
     def connect_to_seed(self, seed):
-        logger.info(f"Connecting to seed {seed}")
+        logger.debug(f"Connecting to seed {seed}")
 
         try:
             seed_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -100,7 +100,7 @@ class Peer:
                     if self.seeds[seed_key]['connection']:
                         break  # Stop sending once connected
                 except (BrokenPipeError, ConnectionResetError) as e:
-                    logger.error(f"Failed to send data to seed {seed}: {e}")
+                    logger.debug(f"Failed to send data to seed {seed}: {e}")
                     return  # Stop execution on failure
 
             # Close the first socket before creating a new one
@@ -137,11 +137,11 @@ class Peer:
 
     
     def connect_to_peers(self):
-        logger.info("Starting peer connections...")
+        logger.debug("Starting peer connections...")
 
         for peer in self.peers.keys():
             if self.peers[peer]["connection"]:  # Skip already connected peers
-                logger.info(f"Skipping already connected peer: {peer}")
+                logger.debug(f"Skipping already connected peer: {peer}")
                 continue
 
             peer_host, peer_port = peer.split(":")
@@ -151,7 +151,7 @@ class Peer:
             peer_thread.start()
     
     def connect_to_peer(self, peer_host, peer_port):
-        logger.info(f"Attempting connection to peer {peer_host}:{peer_port}")
+        logger.debug(f"Attempting connection to peer {peer_host}:{peer_port}")
 
         try:
             peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -183,7 +183,7 @@ class Peer:
 
 
     def handle_client(self, client_socket, address):
-        logger.info(f"Connection from {address}")
+        logger.debug(f"Connection from {address}")
         
         try:
             received_message = client_socket.recv(1024).decode()
@@ -196,7 +196,7 @@ class Peer:
                 # Handling seed connection acknowledgment
                 seed_key = f"{message['host']}:{message['port']}"
                 self.seeds[seed_key]['connection'] = True
-                logger.info(f"Received seed connection confirmation: {received_message}")
+                logger.debug(f"Received seed connection confirmation: {received_message}")
 
             elif message.get("request Type") == "ConnectPeer":
                 # Handling peer connection request
@@ -205,12 +205,12 @@ class Peer:
                 # If peer is not already connected, add it to the peer list
                 if peer_key not in self.peers:
                     self.peers[peer_key] = {"connection": True, "Received_from": address}
-                    logger.info(f"New peer added: {peer_key}")
+                    logger.debug(f"New peer added: {peer_key}")
 
                 # Send confirmation response
                 response = {"response Type": "ConnectedToPeer"}
                 client_socket.sendall(json.dumps(response).encode())
-                logger.info(f"Sent connection confirmation to {peer_key}")
+                logger.debug(f"Sent connection confirmation to {peer_key}")
 
             elif message.get("request Type") == "Gossip":
                 gossip_msg = message["message"]
@@ -248,7 +248,7 @@ class Peer:
             message = f"{timestamp}:{self.host}:{self.port}:{message_count}"
 
             if self.messageList.insert(message, self.host):  # Prevent duplicate propagation
-                logger.info(f"Generated gossip message: {message}")
+                logger.debug(f"Generated gossip message: {message}")
 
                 # Lock peers list while iterating to avoid race conditions
                 with self.lock:
@@ -273,7 +273,7 @@ class Peer:
             message_data = {"request Type": "Gossip", "message": message,"host": self.host, "port": self.port}
             peer_socket.sendall(json.dumps(message_data).encode())
 
-            logger.info(f"Sent gossip message to {peer_host}:{peer_port}")
+            logger.debug(f"Sent gossip message to {peer_host}:{peer_port}")
             peer_socket.close()
         
         except (socket.timeout, ConnectionRefusedError) as e:
@@ -281,15 +281,15 @@ class Peer:
     
     def check_peer_liveness(self):
         """Checks if connected peers are alive by attempting to open a TCP connection."""
-        logger.info("Starting peer liveliness check thread...")  # Debugging log
+        logger.debug("Starting peer liveliness check thread...")  # Debugging log
 
         while self.running:
-            logger.info("Liveliness thread is active.")  # Debugging log
+            logger.debug("Liveliness thread is active.")  # Debugging log
 
             with self.lock:
                 for peer in list(self.peers.keys()):
                     if not self.peers[peer].get("connection", False):
-                        logger.info(f"Skipping inactive peer: {peer}")
+                        logger.debug(f"Skipping inactive peer: {peer}")
                         continue
 
                     peer_host, peer_port = peer.split(":")
@@ -301,7 +301,7 @@ class Peer:
                         sock.connect((peer_host, peer_port))
                         sock.close()
                         self.peers[peer]["ping_failures"] = 0  # Reset failure count
-                        logger.info(f"Peer {peer} is alive.")
+                        logger.debug(f"Peer {peer} is alive.")
 
                     except (socket.timeout, ConnectionRefusedError):
                         self.peers[peer]["ping_failures"] = self.peers.get(peer, {}).get("ping_failures", 0) + 1
@@ -335,7 +335,7 @@ class Peer:
             message = {"request Type": "Death", "host": dead_host, "port": dead_port}
             seed_socket.sendall(json.dumps(message).encode())
 
-            logger.info(f"Notified seed {seed} about dead peer {dead_host}:{dead_port}")
+            logger.debug(f"Notified seed {seed} about dead peer {dead_host}:{dead_port}")
             seed_socket.close()
 
         except (socket.timeout, ConnectionRefusedError) as e:
@@ -389,11 +389,19 @@ def __main__():
     parser = argparse.ArgumentParser(description="P2P Peer")
     parser.add_argument("--port", type=int, default=3000,help="Port number for the peer to listen on")
     parser.add_argument("--max-peers", type=int,default = 5, help="Maximum number of peers to connect to")
+    parser.add_argument("--host", type=str, default="localhost", help="Host IP address")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     args = parser.parse_args()
-    HOST = socket.gethostbyname(socket.gethostname())
+    if args.host == "localhost":
+        HOST = "localhost"
+    elif args.host == "":
+        HOST = socket.gethostbyname(socket.gethostname())
     # HOST = '127.0.0.1'
     global logger
-    logger = setup_logger(f"logs/peer_{HOST}_{args.port}.log")
+    if(args.debug):
+        logger = setup_logger(f"logs/peer_{HOST}_{args.port}.log", debug=True)
+    else:
+        logger = setup_logger(f"logs/peer_{HOST}_{args.port}.log")
     logger.info(f"Starting peer on port {args.port}")
     logger.info(f"Maximum peers: {args.max_peers}")
     logger.info(f"Host IP: {HOST}")
