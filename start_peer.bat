@@ -6,7 +6,7 @@ rem Set the Python executable path if necessary
 set PYTHON_PATH=python
 
 rem List of ports to start the peer servers
-set PORTS=3000 3001 
+set PORTS=3000 3001 3002 3003 3004 3005 3006 3007 3008
 
 rem Loop through each port and start a peer server in a new Command Prompt
 for %%P in (%PORTS%) do (

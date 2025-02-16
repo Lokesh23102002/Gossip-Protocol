@@ -56,14 +56,14 @@ For this implementation we have used python 3.11.11
 There is a requirement.txt file first you have to install these requirements
 After that make changes to config.csv with seed ip and port numbers  
 After that start the seed nodes
-  - `python Seed/seed.py --port <PORT_NUMBER> --max-peers <MAX_PEERS>` use this command to start all seed nodes
-  - For testing purpose a batch file is also provided in which add the path to your conda environment add the port    numbers and start the ports
+  - `python seed.py --port <PORT_NUMBER> --max-peers <MAX_PEERS>` use this command to start all seed nodes
 
 After that start the peers nodes
-  - `python Peer/peer.py --port <PORT_NUMBER> --max-peers <MAX_PEERS>` use this command to start all peer nodes.
-  - For testing purpose a batch file is also provided in which add the path to your conda environment add the port    numbers and start the nodes at that port
+  - `python peer.py --port <PORT_NUMBER> --max-peers <MAX_PEERS>` use this command to start all peer nodes.
 
 NOTE:- by default the ip used is the ip used by your PC (Host device).
+
+For Testing purpose on windows device one can also use the `start_peer.bat` and `start_seed.bat` which autometically creates peers and seeds solving the problem to manually opening the terminals.
 
 
 

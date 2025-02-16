@@ -49,7 +49,7 @@ class Peer:
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind((self.host, self.port))
         self.server_socket.listen(self.listen_thread)
-        self.server_socket.setblocking(False)
+        self.server_socket.setblocking(True)
         logger.info(f"Server started on {self.host}:{self.port}")
 
         while self.running:
@@ -57,9 +57,6 @@ class Peer:
                 client_socket, address = self.server_socket.accept()
                 client_thread = threading.Thread(target=self.handle_client, args=(client_socket, address))
                 client_thread.start()
-
-            except BlockingIOError:
-                time.sleep(0.1)
 
             except OSError:
                 break
@@ -186,7 +183,7 @@ class Peer:
         logger.info(f"Connection from {address}")
         
         try:
-            received_message = client_socket.recv(1024).decode()
+            received_message = client_socket.recv(2048).decode()
             if not received_message:
                 return  # No data received, ignore the request
 
@@ -233,7 +230,8 @@ class Peer:
             logger.error(f"Invalid JSON received from {address}")
 
         except Exception as e:
-            logger.error(f"Error handling client {address}: {e}")
+            
+            logger.error(f"Error handling client {address}: {e} : message: {received_message}")
 
         finally:
             client_socket.close()  # Ensure socket closure
